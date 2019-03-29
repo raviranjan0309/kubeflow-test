@@ -1,0 +1,26 @@
+{
+  "environment": "web",
+  "source": "01-kubeflow-setup.md",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2019-03-26T12:52:40-07:00",
+  "id": "01-kubeflow-setup",
+  "duration": 7,
+  "title": "Strata Conference SF 2019 : The hitchhiker's guide to deep learning-based recommenders in production",
+  "author": "Abhishek Kumar",
+  "summary": "Deep Learning with Productiion",
+  "theme": "",
+  "status": [
+    "draft"
+  ],
+  "category": [
+    "sdk"
+  ],
+  "tags": [
+    "android"
+  ],
+  "feedback": "github.com/meabhishekkumar",
+  "ga": "0",
+  "url": "01-kubeflow-setup"
+}
