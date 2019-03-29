@@ -3,24 +3,21 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import sys
+import tempfile
+import pandas as pd
+from six.moves import urllib
+import tensorflow as tf
 import json
 import os
-import sys
 import numpy as np
-import tensorflow as tf
-import tensorflow as tf
-from tensorflow.keras.layers import Input, Embedding, Flatten, Dot, Dense, Concatenate
-from tensorflow.keras.models import Model
-
-
-n_users = 53424
-n_items = 10000
+from sklearn.model_selection import train_test_split
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tf-data-dir',
                       type=str,
-                      default='/tmp/data/ratings.csv',
+                      default='/tmp/data/train.csv',
                       help='GCS path or local path of training data.')
     parser.add_argument('--tf-model-dir',
                       type=str,
@@ -49,73 +46,36 @@ def parse_arguments():
     args = parser.parse_args()
     return args
 
-def parser(item_id, user_id, rating):
-    x = {
-        'User-Input': user_id,
-        'Item-Input': item_id
-     }
+COLUMNS = [
+    "count_conscecutive_visits", "recency_day", "recency_week", "visit_number", "output_binary"
+]
+
+FEATURE_COLUMNS = [
+    "count_conscecutive_visits", "recency_day", "recency_week", "visit_number"
+]
+
+INPUT_COLUMNS = [
+  # Continuous base columns.
+    tf.feature_column.numeric_column('count_conscecutive_visits'),
+    tf.feature_column.numeric_column('recency_day'),
+    tf.feature_column.numeric_column('recency_week'),
+    tf.feature_column.numeric_column('visit_number'),
+]
+
+BATCH_SIZE = 40
+num_epochs = 1
+shuffle = True
+
+# [START serving-function]
+def serving_input_receiver_fn():
+    """Build the serving inputs."""
+    global FEATURE_COLUMNS
+    inputs = {}
+    for feat in FEATURE_COLUMNS:
+        inputs[feat] = tf.placeholder(shape=[None], dtype=tf.float32)
     
-    y = rating
-    return x,y    
-
-
-def train_input_fn(csv_path, batch_size=1024, buffer_size=1024):
-    dataset = (
-        tf.data.experimental.CsvDataset(
-            filenames=csv_path,
-            record_defaults=[tf.int32, tf.int32, tf.int32],
-            select_cols=[0, 1, 2],
-            field_delim=",",
-            header=True)
-        .map(parser)
-        .shuffle(buffer_size=buffer_size)
-        .batch(batch_size)
-        .prefetch(batch_size)
-    )
-    iterator = dataset.make_one_shot_iterator()
-    batch_feats, batch_labels = iterator.get_next()
-    return batch_feats, batch_labels
-
-def eval_input_fn(csv_path, batch_size=1000):
-    dataset = (
-        tf.data.experimental.CsvDataset(
-            filenames=csv_path,
-            record_defaults=[tf.int32, tf.int32, tf.int32],
-            select_cols=[0, 1, 2],
-            field_delim=",",
-            header=True)
-        .map(parser)
-        .batch(batch_size)
-    )
-    iterator = dataset.make_one_shot_iterator()
-    batch_feats, batch_labels = iterator.get_next()
-    return batch_feats, batch_labels
-
-
-def get_estimator(args):
-    # creating book embedding path
-    item_input = Input(shape=[1], name="Item-Input")
-    item_embedding = Embedding(n_items+1, args.tf_embedding_size, name="Item-Embedding")(item_input)
-    item_vec = Flatten(name="Flatten-Items")(item_embedding)
-
-    # creating user embedding path
-    user_input = Input(shape=[1], name="User-Input")
-    user_embedding = Embedding(n_users+1, args.tf_embedding_size, name="User-Embedding")(user_input)
-    user_vec = Flatten(name="Flatten-Users")(user_embedding)
-
-    # concatenate features
-    conc = Concatenate()([item_vec, user_vec])
-
-    # add fully-connected-layers
-    fc1 = Dense(128, activation='relu')(conc)
-    fc2 = Dense(32, activation='relu')(fc1)
-    out = Dense(1)(fc2)
-
-    # Create model and compile it
-    model = Model([user_input, item_input], out)
-    model.compile('adam', 'mean_squared_error')
-    model.summary()
-    return tf.keras.estimator.model_to_estimator(keras_model=model,model_dir=args.tf_model_dir)
+    return tf.estimator.export.ServingInputReceiver(inputs, inputs)
+# [END serving-function]
 
 
 def main(_):
@@ -137,32 +97,58 @@ def main(_):
         tf.logging.info("Will export model")
     else:
         tf.logging.info("Will not export model")
+    
+    #update the path
+    train_file = 'train.csv'
+    df = pd.read_csv(train_file)
+    y = df["output_binary"]
+    del df["output_binary"]
+    X = df
 
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state=12345)
 
-    train_spec = tf.estimator.TrainSpec(input_fn = lambda: train_input_fn(args.tf_data_dir, batch_size=args.tf_batch_size, buffer_size=args.tf_batch_size), max_steps=args.tf_train_steps)
-    eval_spec = tf.estimator.EvalSpec(input_fn = lambda: eval_input_fn(args.tf_data_dir, batch_size=args.tf_batch_size) ,steps=1,throttle_secs=1,
-                                      start_delay_secs=1 )
+    train_input_fn = tf.estimator.inputs.pandas_input_fn(
+        x=X_train,
+        y=y_train,
+        batch_size=BATCH_SIZE,
+        num_epochs=num_epochs,
+        shuffle=shuffle)
+    
+    test_input_fn = tf.estimator.inputs.pandas_input_fn(
+        x=X_test,
+        y=y_test,
+        batch_size=BATCH_SIZE,
+        num_epochs=num_epochs,
+        shuffle=shuffle)
 
-    # estimator 
-    estimator = get_estimator(args)
+    classifier = tf.estimator.DNNLinearCombinedClassifier(
+              linear_feature_columns=INPUT_COLUMNS,
+              dnn_feature_columns=INPUT_COLUMNS,
+              dnn_hidden_units=[100, 70, 50, 25])
+    
+
+    serving_fn = serving_input_receiver_fn
+
+    #update the path
+    export_final = tf.estimator.FinalExporter(
+      "export", serving_input_receiver_fn=serving_input_receiver_fn)
+
+    train_spec = tf.estimator.TrainSpec(
+        input_fn=train_input_fn, max_steps=5)
+
+    eval_spec = tf.estimator.EvalSpec(input_fn=test_input_fn,
+                                      steps=1,
+                                      throttle_secs=1,
+                                      start_delay_secs=1)
+
     print("Train and evaluate")
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    tf.estimator.train_and_evaluate(classifier, train_spec, eval_spec)
     print("Training done")
 
-    # exporting model
-    if is_chief:
-        # setup feature specification for serving
-        feature_spec = {
-            'User-Input' : tf.FixedLenFeature(shape=[1], dtype=np.float32),
-            'Item-Input' : tf.FixedLenFeature(shape=[1], dtype=np.float32)
-        }
-        print("Export saved model")
-        serving_fn = tf.estimator.export.build_parsing_serving_input_receiver_fn(feature_spec)
-        export_dir = estimator.export_savedmodel(args.tf_export_dir, 
-                                       serving_input_receiver_fn=serving_fn)
+    print("Export saved model")
+    #update the path
+    classifier.export_savedmodel("export", serving_input_receiver_fn=serving_fn)
+    print("Done exporting the model")
 
-        print("Done exporting the model")
-
-    
 if __name__ == '__main__':
     tf.app.run()
