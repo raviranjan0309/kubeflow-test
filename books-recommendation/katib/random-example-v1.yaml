@@ -4,7 +4,7 @@ metadata:
   namespace: kubeflow
   labels:
     controller-tools.k8s.io: "1.0"
-  name: random-example
+  name: random-example-v1
 spec:
   studyName: random-example
   owner: crd

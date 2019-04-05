@@ -262,9 +262,9 @@ kubectl get service web-ui
 
 
 ### Katib 
-kubectl apply -f $WORKING_DIR/katib/random-example.yaml
+kubectl apply -f $WORKING_DIR/katib/random-example-v1.yaml
 kubectl get studyjob -n="kubeflow"
-kubectl describe studyjobs random-example -n="kubeflow"
+kubectl describe studyjobs random-example-v1 -n="kubeflow"
 
 
 ### Clean up 
