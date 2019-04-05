@@ -99,7 +99,7 @@ def main(_):
         tf.logging.info("Will not export model")
     
     #update the path
-    train_file = 'train.csv'
+    train_file = 'tmp/data/train.csv'
     df = pd.read_csv(train_file)
     y = df["output_binary"]
     del df["output_binary"]

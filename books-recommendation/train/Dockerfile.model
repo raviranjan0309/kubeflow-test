@@ -2,7 +2,7 @@
 FROM tensorflow/tensorflow:1.12.0
 
 RUN mkdir /tmp/data
-ADD ratings.csv /tmp/data/ratings.csv
+ADD train.csv /tmp/data/train.csv
 RUN mkdir /tmp/export
 ADD model.py /opt/model.py
 RUN chmod +x /opt/model.py
