@@ -27,7 +27,10 @@ def parse_arguments():
                       type=str,
                       default='/tmp/export/',
                       help='GCS path or local directory to export model')
-    
+    parser.add_argument('--hd1',
+                        type=int,
+                        default=100,
+                        help='The hyperparamer value for layer one')
 
     parser.add_argument('--tf-train-steps',
                         type=int,
@@ -124,7 +127,7 @@ def main(_):
     classifier = tf.estimator.DNNLinearCombinedClassifier(
               linear_feature_columns=INPUT_COLUMNS,
               dnn_feature_columns=INPUT_COLUMNS,
-              dnn_hidden_units=[100, 70, 50, 25])
+              dnn_hidden_units=[args.hd1, 70, 50, 25])
     
 
     serving_fn = serving_input_receiver_fn
