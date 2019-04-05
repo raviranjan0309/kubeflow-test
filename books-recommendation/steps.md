@@ -262,7 +262,7 @@ kubectl get service web-ui
 
 
 ### Katib 
-kubectl apply -f $WORKING_DIR/katib/hyper-parameter_random.yaml
+kubectl apply -f $WORKING_DIR/katib/random-example.yaml
 kubectl get studyjob
 kubectl describe studyjobs books-recsys-example
 
