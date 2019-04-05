@@ -33,7 +33,7 @@ spec:
               spec:
                 containers:
                 - name: {{.WorkerID}}
-                  image: us.gcr.io/nissan-helios-189503/rr-kubeflow-train-path
+                  image: us.gcr.io/nissan-helios-189503/rr-kubeflow-train-path/v1
                   command:
                   - "/usr/bin/python"
                   - "/opt/model.py"
