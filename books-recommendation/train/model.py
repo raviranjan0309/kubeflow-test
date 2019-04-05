@@ -131,7 +131,7 @@ def main(_):
 
     #update the path
     export_final = tf.estimator.FinalExporter(
-      "tmp/export", serving_input_receiver_fn=serving_input_receiver_fn)
+      args.tf_export_dir, serving_input_receiver_fn=serving_input_receiver_fn)
 
     train_spec = tf.estimator.TrainSpec(
         input_fn=train_input_fn, max_steps=5)
@@ -147,7 +147,7 @@ def main(_):
 
     print("Export saved model")
     #update the path
-    classifier.export_savedmodel("tmp/export", serving_input_receiver_fn=serving_fn)
+    classifier.export_savedmodel(args.tf_export_dir, serving_input_receiver_fn=serving_fn)
     print("Done exporting the model")
 
 if __name__ == '__main__':
